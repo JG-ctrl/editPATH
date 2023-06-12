@@ -4,14 +4,12 @@
 
 editpath() {
 
-        # idk why but if i dont write this, it doesnt work
-        local OPTIND myflag
+        local OPTIND 
 
         # declare opt, opt refers to final option
         opt=None
         # loop thru until you get to last option
         while getopts ":apd" flag ; do
-                #echo $flag
                 # makes sure its a valid arguement
                 if [ $flag = a ] || [ $flag = p ] || [ $flag = d ] ; then
                         opt=$flag
@@ -20,20 +18,19 @@ editpath() {
 
         # if no option
         if [ $opt = None ] ; then
-                # send error message to stderr
+                # send error message to stderr; exitcode 1
                 echo "you didn't pick an option :(" >&2
                 return 1
         fi
 
-        #echo final option $opt
-
         # shift to remove all options, now only arguements
         shift $(/usr/bin/expr $OPTIND - 1)
 
-        # apprend
-        # might have to consider edge case where path is empty and there is no colon
+        # apprend arguments to PATH 
+        # (do not check validity or duplicates, let user do whatever they want)
         if [ $opt = a ] ; then
                 until [ $# = 0 ] ; do
+                        # edgecase, if PATH is empty then arguement is new pATH
                         if [ -z "$PATH" ] ; then
                                 PATH=$1
                         else
@@ -43,7 +40,7 @@ editpath() {
                 done
         fi
 
-        # prepend
+        # prepend arguments to PATH
         if [ $opt = p ] ; then
                 until [ $# = 0 ] ; do
                         if [ -z "$PATH" ] ; then # edge case the PATH has nothing in it
@@ -55,43 +52,30 @@ editpath() {
                 done
         fi
 
-        # delete
+        # delete arguments from PATH
+        # if appear more than once, delete all appearances
+        # if doesnt argument isnt in PATH, dont delete anything
         if [ $opt = d ] ; then
-                # make colons in PATH newlines, format more like a file
+                # make colons in PATH newlines; format more like a file
                 new_PATH=$(echo "$PATH" | /usr/bin/tr ':' '\n')
                 until [ $# = 0 ] ; do
-                        # try to find lines to delete
-                        # first find the lines that math $1 in new_PATH with grep
-                        # echo $1
-                        # echo NEW PATH IS `echo "$PATH" | /usr/bin/tr ':' '\n' | /usr/bin/grep -x -n -F $1`
+                        # find line numbers of the arguments to delete in reverse order
+                        # reverse order bc as you delete lines, the line numbers shouldn't change
                         lines_to_delete=`echo "$PATH" | /usr/bin/tr ':' '\n' | /usr/bin/grep -x -n -F "$1" | /usr/bin/cut -d : -f 1 | /usr/bin/sort -r` 
-                        #echo FINDING LINE $lines_to_delete
-                        #echo $line_to_delete
-                        #echo PARSING LINE BEFORE `echo "$line_to_delete" | /usr/bin/cut -d: -f1`
-                        #lines_to_delete=`echo "$line_to_delete" | /usr/bin/cut -d ":" -f1`
-                        #echo PARSING LINE $lines_to_delete
-                        #echo $1 $lines_to_delete
-
-                        # sorts lines from greatest to smallest so i dont need to worry
-                        # about the index changing after i delete then
-                        #lines_to_delete=$(echo "$lines_to_delete" | /usr/bin/sort)
-                        #echo PATH IS "$PATH"
-                        #echo NEW PATH IS "$new_PATH"
-                        # this only runs if found lines bc else to_delete is empty
+                        
+                        # this only runs if found lines bc else to_delete is empty (i.e. no worries if arg arent in PATh)
                         for line in $lines_to_delete ; do
-                                # deletes line from new_PATH
+                                # deletes lines from new_PATH
                                 new_PATH=$(echo "$new_PATH" | /usr/bin/sed ${line}d)
                         done
-                        #echo NEW PATH AFTER IS "$new_PATH"
-			shift
+			
+                        # move to next argument and repeat
+                        shift
                 done
 
-                # change format back to path with colons instead of newlines for everything
-                # except last newline
+                # change format back; replace newlines with colons for everything except last newline
                 new_PATH=$(echo "$new_PATH" | /usr/bin/paste -s -d ":")
+                # make PATH equal to the changed PATH
                 PATH="$new_PATH"
-        fi
-        
-
-
+        fi  
 }
